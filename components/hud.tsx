@@ -3,6 +3,20 @@
  * Sólo presentación: reciben props y devuelven marcado. Cero matemática.
  */
 import { BookOpen } from 'lucide-react'
+import { sciPartes } from '@/lib/password-analysis'
+
+/* ── Número en notación científica: 4.47 × 10²⁵ ──
+   El exponente va en <sup> real, así todos sus dígitos salen del mismo
+   tipo de letra y al mismo tamaño (ver sciPartes). */
+export function Sci({ value }: { value: bigint }) {
+  const { mantisa, exp } = sciPartes(value)
+  if (exp === 0) return <>{mantisa}</>
+  return (
+    <>
+      {mantisa} × 10<sup>{exp}</sup>
+    </>
+  )
+}
 
 /* ── Contenedor con el marco del HUD ── */
 export function Panel({

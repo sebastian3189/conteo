@@ -33,13 +33,12 @@ import {
   esFuerte,
   REGLAS,
   formatBig,
-  sci,
 } from '@/lib/password-analysis'
 
 /* ═══════════════════════════════════════════════════════════════
    COMPONENTES VISUALES
    ═══════════════════════════════════════════════════════════════ */
-import { Panel, Paso, Teoria, Teorema } from '@/components/hud'
+import { Panel, Paso, Sci, Teoria, Teorema } from '@/components/hud'
 import { Piloto } from '@/components/piloto'
 
 /* Contraseñas de ejemplo para los botones de carga rápida */
@@ -339,7 +338,7 @@ export default function Page() {
           <div className="metric-label">
             VARIACIONES CON REPETICIÓN<span>n^k</span>
           </div>
-          <div className="metric-value">{sci(stats.rep)}</div>
+          <div className="metric-value"><Sci value={stats.rep} /></div>
           <div className="full-value">
             ENTERO COMPLETO: <b>{formatBig(stats.rep)}</b>
           </div>
@@ -364,7 +363,7 @@ export default function Page() {
                   {stats.devRep}
                 </Paso>
                 <Paso n={5} label="Resultado">
-                  = <b>{sci(stats.rep)}</b> claves posibles
+                  = <b><Sci value={stats.rep} /></b> claves posibles
                 </Paso>
                 <Paso n={6} label="Equivalente en información (entropía)">
                   H = k · log₂(n) = {stats.k} · log₂({stats.sets}) ={' '}
@@ -407,7 +406,7 @@ export default function Page() {
             VARIACIONES SIN REPETICIÓN<span>n!/(n−k)!</span>
           </div>
           <div className="metric-value">
-            {stats.noRep ? sci(stats.noRep) : 'N/A'}
+            {stats.noRep ? <Sci value={stats.noRep} /> : 'N/A'}
           </div>
           <div className="full-value">
             {stats.noRep ? (
@@ -439,7 +438,7 @@ export default function Page() {
                       {stats.devNoRep}
                     </Paso>
                     <Paso n={4} label="Resultado">
-                      = <b>{sci(stats.noRep)}</b>
+                      = <b><Sci value={stats.noRep} /></b>
                     </Paso>
                     <Paso n={5} label="Comparación con MELCHIOR (n^k)">
                       V / VR = <b>{stats.porcNoRep.toFixed(2)} %</b> — prohibir
@@ -492,7 +491,7 @@ export default function Page() {
           <div className="metric-label">
             PERMUTACIONES (k!)<span>{stats.k}!</span>
           </div>
-          <div className="metric-value">{sci(stats.perm)}</div>
+          <div className="metric-value"><Sci value={stats.perm} /></div>
           <div className="full-value">
             ENTERO COMPLETO: <b>{formatBig(stats.perm)}</b>
           </div>
@@ -509,7 +508,7 @@ export default function Page() {
                   {stats.k}! = {stats.devPerm}
                 </Paso>
                 <Paso n={3} label="Resultado">
-                  = <b>{sci(stats.perm)}</b> ordenaciones
+                  = <b><Sci value={stats.perm} /></b> ordenaciones
                 </Paso>
                 <Paso n={4} label="Corrección por repetidos — permutaciones con repetición">
                   PR = k! / (r₁!·r₂!·…·r<sub>m</sub>!) = {stats.k}! / ({stats.divisorTxt})
@@ -638,10 +637,10 @@ export default function Page() {
             </div>
             <div className="derivation derivation-wide">
               <Paso n={1} label="Modelo: recorrer todo el espacio muestral a R intentos/segundo">
-                T = VR / R,  donde VR = n<sup>k</sup> y R = 10⁶ intentos/s
+                T = VR / R,  donde VR = n<sup>k</sup> y R = 10<sup>6</sup> intentos/s
               </Paso>
               <Paso n={2} label="Sustitución">
-                T = {sci(stats.rep)} / 10⁶
+                T = <Sci value={stats.rep} /> / 10<sup>6</sup>
               </Paso>
               <Paso n={3} label="Resultado en segundos y en unidades legibles">
                 T ≈ <b>{stats.tiempoFmt}</b>

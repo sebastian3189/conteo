@@ -90,6 +90,11 @@ h1, h2, p { margin: 0; } h1 { font: 800 clamp(18px, 2.2vw, 31px)/1.15 Orbitron, 
 .card-bottom b,
 .footer-metrics b { overflow-wrap: anywhere; }
 
+/* Exponente del número grande. Va en <sup> real (no en superíndices
+   Unicode, que mezclan dos bloques y salen de tamaños distintos), así
+   que aquí se fija su cuerpo para que todos sus dígitos sean iguales. */
+.metric-value sup { font-size: .5em; vertical-align: super; letter-spacing: .02em; }
+
 /* Las fórmulas se leen mejor en una sola línea: en vez de partirse,
    se desplazan dentro de su propia caja sin arrastrar la página. */
 .teorema-formula { max-width: 100%; overscroll-behavior-x: contain; }

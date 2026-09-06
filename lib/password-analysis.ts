@@ -116,14 +116,21 @@ export function formatBig(value: bigint): string {
   return value.toLocaleString('es-ES')
 }
 
-/** Notación científica con superíndices: 3.45 × 10⁴² */
-export function sci(value: bigint): string {
-  if (value === 0n) return '0'
+/**
+ * Descompone un entero en notación científica: 4.47 y 25 para 4.47 × 10^25.
+ *
+ * Devuelve las piezas por separado en vez de una cadena, porque el
+ * exponente hay que pintarlo con <sup> real. Los superíndices Unicode
+ * NO sirven: ¹ ² ³ son caracteres heredados de Latin-1 (U+00B9/B2/B3)
+ * y el resto vienen del bloque Superscripts (U+2070, U+2074…U+2079),
+ * así que las fuentes los dibujan a tamaños distintos y un exponente
+ * como 25 sale descuadrado. Unicode no ofrece un juego uniforme.
+ */
+export function sciPartes(value: bigint): { mantisa: string; exp: number } {
+  if (value === 0n) return { mantisa: '0', exp: 0 }
   const s = value.toString()
   const exp = s.length - 1
-  const sups = (n: number) =>
-    n.toString().replace(/[0-9]/g, (x) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(x)])
-  return `${s[0]}.${s.slice(1, 3).padEnd(2, '0')} × 10${sups(exp)}`
+  return { mantisa: `${s[0]}.${s.slice(1, 3).padEnd(2, '0')}`, exp }
 }
 
 /** Convierte segundos a la unidad de tiempo más adecuada. */
@@ -169,21 +176,32 @@ export function esFuerte(contrasena: string): boolean {
   return esValida(contrasena) && contrasena.length >= 16
 }
 
+/** Entropía a partir de la cual una clave que ya cumple las reglas
+ *  se considera excelente. 90 bits ≈ 14 caracteres del alfabeto completo. */
+export const BITS_MUY_FUERTE = 90
+
 /**
- * Nivel de fortaleza a partir de los bits de entropía.
+ * Nivel de fortaleza. Es lo que da su color al robot.
  *
- * A diferencia de `validar`, que es todo-o-nada, esto es una escala
- * continua: sube carácter a carácter mientras se escribe. Es lo que
- * usa el robot para su color.
+ * Se apoya en DOS criterios, y por eso no es sólo la entropía:
+ *
+ *  1. Si falla cualquier regla de `validar`, la clave es insegura y va
+ *     en ROJO por muchos bits que tenga. Así el robot dice lo mismo que
+ *     la lista de comprobación y el aviso CRÍTICO: sin esto, generar una
+ *     clave de 8 caracteres (52 bits) marcaba «RIESGO DE BRECHA» en el
+ *     panel mientras el robot seguía en naranja.
+ *  2. Ya cumpliendo las reglas, la entropía separa lo correcto de lo
+ *     excelente.
  */
-export function nivelFortaleza(n: number, k: number) {
+export function nivelFortaleza(contrasena: string) {
+  const { n } = calcularAlfabeto(contrasena)
+  const k = contrasena.length
   const bits = entropiaBits(n, k)
+
   let nivel: string
   let color: string
-  if (bits < 30) { nivel = 'Muy débil'; color = ROJO }
-  else if (bits < 50) { nivel = 'Débil'; color = ROJO }
-  else if (bits < 65) { nivel = 'Moderada'; color = NARANJA }
-  else if (bits < 90) { nivel = 'Fuerte'; color = VERDE }
+  if (!esValida(contrasena)) { nivel = 'Insegura'; color = ROJO }
+  else if (bits < BITS_MUY_FUERTE) { nivel = 'Segura'; color = NARANJA }
   else { nivel = 'Muy fuerte'; color = VERDE }
 
   return {
@@ -267,7 +285,7 @@ export function evaluar(contrasena: string) {
   const tiempoSeg = tiempoFuerzaBruta(rep)
   const tiempoFmt = fmtTiempo(tiempoSeg)
   const bits = entropiaBits(sets, k)
-  const fortaleza = nivelFortaleza(sets, k)
+  const fortaleza = nivelFortaleza(contrasena)
 
   /* ── Desarrollo paso a paso (notación matemática lista para mostrar) ── */
 
