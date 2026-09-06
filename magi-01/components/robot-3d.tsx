@@ -318,9 +318,12 @@ function Robot({ oculto, tono, alerta }: { oculto: boolean; tono: string; alerta
     /* ── cabeza: mira al cursor ── */
     if (cabeza.current) {
       cabeza.current.rotation.y = d(cabeza.current.rotation.y, mx * 0.38, 6, dt)
+      // `puntero.y` crece hacia ABAJO (coordenadas de pantalla) y un
+      // rotation.x positivo inclina la cara hacia abajo: los dos signos
+      // coinciden, así que NO hay que negar. Cursor arriba -> mira arriba.
       cabeza.current.rotation.x = d(
         cabeza.current.rotation.x,
-        -my * 0.34 + (oculto ? 0.1 : 0),
+        my * 0.34 + (oculto ? 0.1 : 0),
         6,
         dt,
       )
@@ -330,7 +333,8 @@ function Robot({ oculto, tono, alerta }: { oculto: boolean; tono: string; alerta
     /* ── pupilas: orbitan sobre el globo ocular hacia el cursor ── */
     // Límite: más allá de ~0.42 rad la pupila se saldría del globo ocular
     const py = THREE.MathUtils.clamp(mx * 0.5, -0.42, 0.42)
-    const px = THREE.MathUtils.clamp(-my * 0.42, -0.34, 0.34)
+    // Mismo criterio de signo que la cabeza: sin negar.
+    const px = THREE.MathUtils.clamp(my * 0.42, -0.34, 0.34)
     for (const p of [pupilaI.current, pupilaD.current]) {
       if (!p) continue
       p.rotation.y = d(p.rotation.y, py, 12, dt)
@@ -442,8 +446,10 @@ function Robot({ oculto, tono, alerta }: { oculto: boolean; tono: string; alerta
             <sphereGeometry args={[0.055, 24, 24]} />
             <meshStandardMaterial
               ref={antena}
-              color={alerta ? RED : tono}
-              emissive={alerta ? RED : tono}
+              // Sigue al tono para que reaccione mientras se escribe;
+              // `alerta` sólo controla el ritmo del parpadeo (ver useFrame).
+              color={tono}
+              emissive={tono}
               emissiveIntensity={1}
               roughness={0.2}
               metalness={0.1}
@@ -552,12 +558,15 @@ function Robot({ oculto, tono, alerta }: { oculto: boolean; tono: string; alerta
 /* ═══════════════ ESCENA / CANVAS ═══════════════ */
 export default function Robot3D({
   oculto,
-  fuerte,
   valido,
+  tono,
 }: {
   oculto: boolean
-  fuerte: boolean
+  /** Cumple TODAS las reglas. Sólo controla el parpadeo de alarma. */
   valido: boolean
+  /** Color del visor y la antena. Viene de la entropía, así que
+      cambia carácter a carácter mientras se escribe. */
+  tono: string
 }) {
   const wrap = useRef<HTMLDivElement>(null)
 
@@ -600,8 +609,6 @@ export default function Robot3D({
       window.removeEventListener('resize', medir)
     }
   }, [])
-
-  const tono = fuerte ? '#00ff66' : valido ? '#ff5500' : '#ff0033'
 
   return (
     <div className="robot3d-wrap" ref={wrap}>

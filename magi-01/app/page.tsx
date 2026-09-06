@@ -1,18 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import dynamic from 'next/dynamic'
-import { AnimatePresence, motion } from 'framer-motion'
 import {
   Activity,
-  AlertTriangle,
   Binary,
-  BookOpen,
   Calculator,
   ChevronDown,
   ChevronUp,
   ClipboardCopy,
-  Crosshair,
   Divide,
   Eye,
   EyeOff,
@@ -27,231 +22,32 @@ import {
   Zap,
 } from 'lucide-react'
 
-/* El robot 3D (three.js) sólo se carga en el navegador */
-const Robot3D = dynamic(() => import('@/components/robot-3d'), {
-  ssr: false,
-  loading: () => <div className="robot3d-wrap robot3d-loading">CARGANDO UNIDAD PILOTO…</div>,
-})
+/* ═══════════════════════════════════════════════════════════════
+   LÓGICA — toda la matemática vive en lib/password-analysis.ts.
+   Este archivo NO calcula nada: sólo pide resultados y los muestra.
+   ═══════════════════════════════════════════════════════════════ */
+import {
+  evaluar,
+  generarContrasena,
+  validar,
+  esFuerte,
+  REGLAS,
+  formatBig,
+  sci,
+} from '@/lib/password-analysis'
 
 /* ═══════════════════════════════════════════════════════════════
-   CONSTANTES
+   COMPONENTES VISUALES
    ═══════════════════════════════════════════════════════════════ */
-const MAYUS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-const MINUS = 'abcdefghijklmnopqrstuvwxyz'
-const DIGITOS = '0123456789'
-const SIMBOLOS = '!@#$%^&*()_+-=[]{}|;:\'",.<>?/~`\\'
+import { Panel, Paso, Teoria, Teorema } from '@/components/hud'
+import { Piloto } from '@/components/piloto'
 
+/* Contraseñas de ejemplo para los botones de carga rápida */
 const presets = [
   ['PRUEBA_ALFA', 'c4fe#Tigre79!Nube'],
   ['PRUEBA_BETA', 'm4R3a_Azul#2026'],
   ['PRUEBA_GAMMA', 'Sol#Verde_8492'],
 ] as const
-
-const checks: [string, (p: string) => boolean][] = [
-  ['LONGITUD >= 12', (p) => p.length >= 12],
-  ['MAYÚSCULAS: A-Z', (p) => /[A-Z]/.test(p)],
-  ['NÚMEROS: 0-9', (p) => /\d/.test(p)],
-  ['ESPECIALES: #, _, !', (p) => /[^A-Za-z0-9]/.test(p)],
-]
-
-/* ═══════════════════════════════════════════════════════════════
-   FUNCIONES MATEMÁTICAS
-   ═══════════════════════════════════════════════════════════════ */
-function factorial(n: number): bigint {
-  let r = 1n
-  for (let i = 2; i <= n; i++) r *= BigInt(i)
-  return r
-}
-
-function formatBig(value: bigint): string {
-  return value.toLocaleString('es-ES')
-}
-
-function sci(value: bigint): string {
-  if (value === 0n) return '0'
-  const s = value.toString()
-  const exp = s.length - 1
-  const sups = (n: number) =>
-    n
-      .toString()
-      .replace(/[0-9]/g, (x) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(x)])
-  return `${s[0]}.${s.slice(1, 3).padEnd(2, '0')} × 10${sups(exp)}`
-}
-
-function fmtTiempo(segundos: number): string {
-  if (segundos < 0.001) return 'Instantáneo'
-  if (segundos < 1) return '< 1 segundo'
-  if (segundos < 60) return `${segundos.toFixed(0)} segundos`
-  if (segundos < 3600) return `${(segundos / 60).toFixed(1)} minutos`
-  if (segundos < 86400) return `${(segundos / 3600).toFixed(1)} horas`
-  if (segundos < 31_536_000) return `${(segundos / 86400).toFixed(0)} días`
-  const anios = segundos / 31_536_000
-  if (anios < 1_000) return `${anios.toFixed(1)} años`
-  if (anios < 1e6) return `${Math.round(anios).toLocaleString('es-ES')} años`
-  if (anios < 1e9) return `${(anios / 1e6).toFixed(1)} millones de años`
-  if (anios < 1e12)
-    return `${(anios / 1e9).toFixed(1)} mil millones de años`
-  const exp = Math.floor(Math.log10(anios))
-  const m = anios / 10 ** exp
-  return `${m.toFixed(2)} × 10^${exp} años`
-}
-
-function generarContrasena(
-  longitud: number,
-  usarMayus: boolean,
-  usarMinus: boolean,
-  usarDigitos: boolean,
-  usarSimbolos: boolean,
-): string {
-  let pool = ''
-  const obligatorios: string[] = []
-  if (usarMayus) {
-    pool += MAYUS
-    obligatorios.push(MAYUS[Math.floor(Math.random() * MAYUS.length)])
-  }
-  if (usarMinus) {
-    pool += MINUS
-    obligatorios.push(MINUS[Math.floor(Math.random() * MINUS.length)])
-  }
-  if (usarDigitos) {
-    pool += DIGITOS
-    obligatorios.push(DIGITOS[Math.floor(Math.random() * DIGITOS.length)])
-  }
-  if (usarSimbolos) {
-    pool += SIMBOLOS
-    obligatorios.push(SIMBOLOS[Math.floor(Math.random() * SIMBOLOS.length)])
-  }
-  if (!pool) return ''
-  const rest = longitud - obligatorios.length
-  const chars = [...obligatorios]
-  for (let i = 0; i < rest; i++)
-    chars.push(pool[Math.floor(Math.random() * pool.length)])
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[chars[i], chars[j]] = [chars[j], chars[i]]
-  }
-  return chars.slice(0, longitud).join('')
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   COMPONENTES
-   ═══════════════════════════════════════════════════════════════ */
-function Panel({
-  children,
-  className = '',
-}: {
-  children: React.ReactNode
-  className?: string
-}) {
-  return <section className={`hud-panel ${className}`}>{children}</section>
-}
-
-/* ── Un paso del desarrollo matemático ── */
-function Paso({
-  n,
-  label,
-  children,
-}: {
-  n: number
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="deriv-step">
-      <i>{n}</i>
-      <div>
-        <small>{label}</small>
-        <code>{children}</code>
-      </div>
-    </div>
-  )
-}
-
-/* ── Nota teórica al pie de cada tarjeta ── */
-function Teoria({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="theory">
-      <BookOpen size={11} />
-      <span>{children}</span>
-    </p>
-  )
-}
-
-/* ── Bloque del marco teórico ── */
-function Teorema({
-  icon,
-  titulo,
-  formula,
-  children,
-}: {
-  icon: React.ReactNode
-  titulo: string
-  formula: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <div className="teorema">
-      <div className="teorema-head">
-        {icon}
-        <h3>{titulo}</h3>
-      </div>
-      <code className="teorema-formula">{formula}</code>
-      <p>{children}</p>
-    </div>
-  )
-}
-
-/* ── Panel del Piloto (Robot 3D + Monitor) ── */
-function Piloto({
-  oculto,
-  fuerte,
-  valido,
-}: {
-  oculto: boolean
-  fuerte: boolean
-  valido: boolean
-}) {
-  return (
-    <div
-      className={`pilot-stage ${fuerte ? 'pilot-strong' : ''} ${!valido ? 'pilot-danger' : ''}`}
-    >
-      <div className="stage-label">
-        <Crosshair size={12} /> MONITOR DE SINCRONIZACIÓN
-      </div>
-      <motion.div
-        className="pilot-aura"
-        animate={{
-          scale: fuerte ? [1, 1.08, 1] : 1,
-          opacity: fuerte ? [0.45, 0.75, 0.45] : 0.3,
-        }}
-        transition={{ repeat: Infinity, duration: 2 }}
-      />
-      <Robot3D oculto={oculto} fuerte={fuerte} valido={valido} />
-      <AnimatePresence>
-        {!valido && (
-          <motion.div
-            className="pilot-warning"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-          >
-            <AlertTriangle size={18} /> CRÍTICO
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <div
-        className={`pilot-status ${fuerte ? 'status-green' : !valido ? 'status-red' : 'status-orange'}`}
-      >
-        {fuerte
-          ? '[ CONTRASEÑA MUY FUERTE — IMPOSIBLE DE ROMPER ]'
-          : !valido
-            ? '[ CONTRASEÑA DÉBIL — RIESGO DE BRECHA ]'
-            : oculto
-              ? '[ CAMPO A.T. ACTIVO — CONTRASEÑA PROTEGIDA ]'
-              : '[ CAMPO A.T. DISUELTO — CONTRASEÑA EXPUESTA ]'}
-      </div>
-    </div>
-  )
-}
 
 /* ═══════════════════════════════════════════════════════════════
    PÁGINA PRINCIPAL
@@ -267,131 +63,14 @@ export default function Page() {
   const [copiado, setCopiado] = useState(false)
   const [verProc, setVerProc] = useState(true)
 
-  const results = checks.map(([, fn]) => fn(password))
+  /* Validación y nivel: lógica importada, no calculada aquí. */
+  const results = validar(password)
   const valid = results.every(Boolean)
-  const strong = valid && password.length >= 16
+  const strong = esFuerte(password)
 
-  /* ── Cálculos matemáticos ── */
-  const stats = useMemo(() => {
-    const hasUpper = /[A-Z]/.test(password)
-    const hasLower = /[a-z]/.test(password)
-    const hasDigit = /\d/.test(password)
-    const hasSpec = /[^A-Za-z0-9]/.test(password)
-    const sets =
-      (hasUpper ? 26 : 0) +
-      (hasLower ? 26 : 0) +
-      (hasDigit ? 10 : 0) +
-      (hasSpec ? 32 : 0)
-    const tipos: string[] = []
-    if (hasUpper) tipos.push('Mayúsculas (+26)')
-    if (hasLower) tipos.push('Minúsculas (+26)')
-    if (hasDigit) tipos.push('Dígitos (+10)')
-    if (hasSpec) tipos.push('Símbolos (+32)')
-
-    const k = password.length
-    const n = BigInt(Math.max(sets, 1))
-
-    // 1. Espacio muestral n^k
-    const rep = n ** BigInt(k)
-
-    // 2. Variaciones sin repetición n!/(n-k)!
-    let noRep = 0n
-    if (k <= sets && sets > 0) {
-      noRep = factorial(sets) / factorial(sets - k)
-    }
-
-    // 3. Permutaciones k!
-    const perm = factorial(k)
-
-    // 4. Permutaciones distinguibles k! / (r1!·r2!·...·rm!)
-    const freq: Record<string, number> = {}
-    for (const c of password) freq[c] = (freq[c] || 0) + 1
-    let denominator = 1n
-    const repeatedFactorials: string[] = []
-    for (const v of Object.values(freq)) {
-      denominator *= factorial(v)
-      if (v > 1) repeatedFactorials.push(`${v}!`)
-    }
-    const permDist = factorial(k) / denominator
-    const tieneRepetidos = repeatedFactorials.length > 0
-
-    // 5. Tiempo de fuerza bruta
-    const tiempoSeg = Number(rep) / 1_000_000
-    const tiempoFmt = fmtTiempo(tiempoSeg)
-
-    // Bits de entropía
-    const bits = sets > 0 ? k * Math.log2(sets) : 0
-
-    /* ─────────────────────────────────────────────────────────────
-       DATOS PARA MOSTRAR EL DESARROLLO PASO A PASO
-       ───────────────────────────────────────────────────────────── */
-
-    // Regla de la suma: n se obtiene sumando conjuntos disjuntos
-    const partes: number[] = []
-    if (hasUpper) partes.push(26)
-    if (hasLower) partes.push(26)
-    if (hasDigit) partes.push(10)
-    if (hasSpec) partes.push(32)
-    const sumaN = partes.join(' + ')
-
-    // MELCHIOR: producto de k factores iguales
-    const devRep =
-      k <= 6 && k > 0
-        ? Array.from({ length: k }, () => sets).join(' × ')
-        : `${sets} × ${sets} × ${sets} × … × ${sets}`
-
-    // BALTHASAR: producto descendente n(n−1)…(n−k+1)
-    const puedeSinRep = k <= sets && sets > 0 && k > 0
-    const devNoRep = !puedeSinRep
-      ? ''
-      : k <= 5
-        ? Array.from({ length: k }, (_, i) => sets - i).join(' × ')
-        : `${sets} × ${sets - 1} × ${sets - 2} × … × ${sets - k + 1}`
-
-    // Qué porcentaje del espacio total queda al prohibir repeticiones
-    const porcNoRep =
-      noRep > 0n && rep > 0n ? Number((noRep * 10000n) / rep) / 100 : 0
-
-    // CASPAR: desarrollo de k!
-    const devPerm =
-      k <= 6 && k > 0
-        ? Array.from({ length: k }, (_, i) => k - i).join(' × ')
-        : `${k} × ${k - 1} × ${k - 2} × … × 2 × 1`
-
-    // Multiplicidades > 1 (para el coeficiente multinomial)
-    const repChars = Object.entries(freq)
-      .filter(([, v]) => v > 1)
-      .map(([c, v]) => `'${c}' aparece ${v} veces`)
-    const divisorTxt = repeatedFactorials.length
-      ? repeatedFactorials.join(' × ')
-      : '1'
-
-    return {
-      sets,
-      tipos,
-      k,
-      n,
-      rep,
-      noRep,
-      perm,
-      permDist,
-      tieneRepetidos,
-      repeatedFactorials,
-      tiempoSeg,
-      tiempoFmt,
-      bits,
-      // desarrollo
-      sumaN,
-      partes,
-      devRep,
-      puedeSinRep,
-      devNoRep,
-      porcNoRep,
-      devPerm,
-      repChars,
-      divisorTxt,
-    }
-  }, [password])
+  /* Todo el análisis combinatorio ocurre en lib/password-analysis.ts.
+     Se recalcula sólo cuando cambia la contraseña. */
+  const stats = useMemo(() => evaluar(password), [password])
 
   const nivelFortaleza = strong
     ? 'SISTEMA ÓPTIMO'
@@ -476,10 +155,13 @@ export default function Page() {
 
           {/* Validación */}
           <div className="check-grid">
-            {checks.map(([label], i) => (
-              <div className={results[i] ? 'check pass' : 'check'} key={label}>
+            {REGLAS.map((regla, i) => (
+              <div
+                className={results[i] ? 'check pass' : 'check'}
+                key={regla.etiqueta}
+              >
                 <span className="tactical-led" />
-                {label}
+                {regla.etiqueta}
                 <b>{results[i] ? 'CUMPLE' : 'FALLA'}</b>
               </div>
             ))}
@@ -621,7 +303,12 @@ export default function Page() {
             </div>
           </div>
         </Panel>
-        <Piloto oculto={!visible} fuerte={strong} valido={valid} />
+        <Piloto
+          oculto={!visible}
+          fuerte={strong}
+          valido={valid}
+          tono={stats.fortaleza.color}
+        />
       </div>
 
       {/* ── SEPARADOR ── */}

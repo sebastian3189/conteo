@@ -13,3 +13,5 @@ __v0_jsx-dev-runtime.ts
 node_modules
 .next/
 .DS_Store
+# Caché de build de TypeScript (no debe versionarse)
+tsconfig.tsbuildinfo
